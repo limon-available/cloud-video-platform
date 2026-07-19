@@ -1,0 +1,305 @@
+================================================================
+Cloud Video Platform — Complete Architecture Documentation
+================================================================
+
+1. HIGH-LEVEL ARCHITECTURE
+----------------------------------------------------------------
+
+   Browser (Client)
+      │
+      │ HTTPS
+      ▼
+   React Frontend (Vite SPA)
+      │
+      │ REST API + JWT Cookies
+      ▼
+   Express Backend API (Node.js)
+      │
+      ├──▶ MongoDB Atlas (Users, Videos, Comments)
+      │
+      ├──▶ Amazon S3 (Video + Thumbnail Storage)
+      │
+      └──▶ Amazon CloudFront (CDN Delivery)
+
+
+2. FRONTEND ARCHITECTURE
+----------------------------------------------------------------
+
+   Tech Stack:
+   - React 18 + Vite
+   - Tailwind CSS
+   - React Router v6
+   - Axios
+
+   Directory Structure:
+   frontend/src/
+   ├── api/axios.js             # Axios instance with interceptors
+   ├── components/
+   │   ├── Navbar.jsx           # Navigation + auth-aware links
+   │   └── VideoCard.jsx        # Reusable video card
+   ├── context/AuthContext.jsx  # JWT state, roles, login/logout
+   ├── pages/
+   │   ├── HomePage.jsx         # Public video grid
+   │   ├── LoginPage.jsx        # JWT login
+   │   ├── RegisterPage.jsx     # Registration (default: viewer)
+   │   ├── WatchPage.jsx        # Video player + comments
+   │   ├── SearchPage.jsx       # Search videos
+   │   ├── ProfilePage.jsx      # Profile + upgrade to creator
+   │   ├── WatchHistoryPage.jsx # Watch history
+   │   ├── AdminDashboard.jsx   # Admin: overview, videos, users
+   │   ├── AdminUploadPage.jsx  # Upload form (admin + creator)
+   │   └── CreatorStudio.jsx    # Creator stats + my videos
+   ├── App.jsx                  # Route definitions
+   └── main.jsx                 # Entry point
+
+
+3. BACKEND ARCHITECTURE
+----------------------------------------------------------------
+
+   Tech Stack:
+   - Node.js + Express.js
+   - MongoDB Atlas (Mongoose)
+   - JWT + bcrypt
+   - Multer (memory storage)
+   - express-validator
+   - AWS SDK v3
+
+   Directory Structure:
+   backend/
+   ├── config/
+   │   ├── db.js                # MongoDB connection
+   │   └── aws.js               # S3 client, CloudFront helpers
+   ├── controllers/
+   │   ├── authController.js    # register/login/logout/become-creator
+   │   ├── videoController.js   # CRUD, like, watch, my-videos
+   │   ├── commentController.js
+   │   └── adminController.js   # stats, users, roles
+   ├── middleware/
+   │   ├── auth.js              # protect + authorize (RBAC)
+   │   ├── errorHandler.js      # Global error handler
+   │   └── upload.js            # Multer configuration
+   ├── models/
+   │   ├── User.js              # User schema + methods
+   │   ├── Video.js             # Video schema + methods
+   │   └── Comment.js           # Comment schema
+   ├── routes/
+   │   ├── auth.js              # /api/auth/*
+   │   ├── videos.js            # /api/videos/*
+   │   ├── comments.js          # /api/videos/:id/comments
+   │   └── admin.js             # /api/admin/*
+   ├── validators/
+   │   ├── authValidator.js
+   │   └── videoValidator.js
+   ├── utils/errorResponse.js   # Custom error class
+   └── server.js                # Express app, middleware, routes
+
+
+4. DATABASE SCHEMA
+----------------------------------------------------------------
+
+   User:
+   - username (unique)
+   - email (unique)
+   - password (select: false)
+   - role: enum ['viewer', 'creator', 'admin'], default: 'viewer'
+   - avatar
+   - watchHistory: [{ video, watchedAt }]
+   - likedVideos: [ObjectId]
+   - timestamps
+
+   Video:
+   - title, description
+   - videoUrl (CloudFront signed URL)
+   - thumbnailUrl (CloudFront signed URL)
+   - s3VideoKey: videos/{userId}/{filename}
+   - s3ThumbnailKey: thumbnails/{userId}/{filename}
+   - category, tags
+   - visibility: public | private | unlisted
+   - status: ready | processing | failed
+   - user (owner ref)
+   - uploadedBy: 'creator' | 'admin'
+   - views, likes
+   - timestamps
+
+   Comment:
+   - text
+   - video (ref)
+   - user (ref)
+   - timestamps
+
+
+5. AUTHENTICATION & RBAC
+----------------------------------------------------------------
+
+   JWT Structure:
+   {
+     "id": "userId",
+     "role": "viewer|creator|admin"
+   }
+
+   Storage: httpOnly cookie (7 days), rotated on role upgrade
+
+   Middleware:
+   1. protect        → verify JWT, attach req.user
+   2. authorize(...) → check req.user.role against allowed roles
+
+   Permission Matrix:
+   ┌────────────────────────┬───────┬─────────┬───────┐
+   │ Action                 │Viewer │ Creator │ Admin │
+   ├────────────────────────┼───────┼─────────┼───────┤
+   │ Browse/Search/Watch    │  ✅   │   ✅    │  ✅   │
+   │ Like/Comment           │  ✅   │   ✅    │  ✅   │
+   │ Become Creator         │  ✅   │   ❌    │  ❌   │
+   │ Upload Video           │  ❌   │   ✅    │  ✅   │
+   │ Edit Own Video         │  ❌   │   ✅    │  ✅   │
+   │ Edit Any Video         │  ❌   │   ❌    │  ✅   │
+   │ Delete Own Video       │  ❌   │   ✅    │  ✅   │
+   │ Delete Any Video       │  ❌   │   ❌    │  ✅   │
+   │ Manage Users           │  ❌   │   ❌    │  ✅   │
+   └────────────────────────┴───────┴─────────┴───────┘
+
+
+6. AWS SERVICES INTEGRATION
+----------------------------------------------------------------
+
+   Amazon S3:
+   - Private bucket for videos and thumbnails
+   - Key patterns:
+     * videos/{userId}/{timestamp}-{filename}
+     * thumbnails/{userId}/{timestamp}-{filename}
+   - Upload: Multer memory buffer → S3.putObject()
+   - Delete: S3.deleteObject() on video delete/thumbnail replace
+   - No public access; CloudFront OAC only
+
+   CloudFront:
+   - Origin: S3 bucket
+   - Signed URLs with expiration for private content
+   - Helper: getCloudFrontSignedUrl(key)
+   - Provides low-latency global delivery
+
+   IAM:
+   - Least-privilege access keys
+   - Permissions: s3:PutObject, s3:DeleteObject, s3:GetObject
+
+   CloudWatch (optional):
+   - Structured JSON logs from Express
+   - Metrics and alarms on EC2
+
+
+7. ROUTING STRUCTURE
+----------------------------------------------------------------
+
+   Public:
+   - GET  /                    → HomePage
+   - GET  /login               → LoginPage
+   - GET  /register            → RegisterPage
+   - GET  /watch/:id           → WatchPage
+   - GET  /search              → SearchPage
+
+   Authenticated (Any role):
+   - GET  /profile             → ProfilePage
+   - GET  /history             → WatchHistoryPage
+
+   Creator:
+   - GET  /studio              → CreatorStudio
+   - GET  /studio/upload       → AdminUploadPage
+
+   Admin:
+   - GET  /admin               → AdminDashboard
+   - GET  /admin/upload        → AdminUploadPage
+
+   API Routes:
+   - POST   /api/auth/register
+   - POST   /api/auth/login
+   - POST   /api/auth/logout
+   - PUT    /api/auth/become-creator
+   - GET    /api/videos
+   - GET    /api/videos/:id
+   - POST   /api/videos           (admin, creator)
+   - PUT    /api/videos/:id       (admin, creator)
+   - DELETE /api/videos/:id       (admin, creator)
+   - POST   /api/videos/:id/like
+   - POST   /api/videos/:id/watch
+   - GET    /api/videos/my-videos/list
+   - POST   /api/videos/:videoId/comments
+   - GET    /api/videos/:videoId/comments
+   - PUT    /api/comments/:id
+   - DELETE /api/comments/:id
+   - GET    /api/admin/stats
+   - GET    /api/admin/users
+   - PUT    /api/admin/users/:id/role
+   - DELETE /api/admin/users/:id
+
+
+8. UPLOAD FLOW
+----------------------------------------------------------------
+
+   1. User selects video + thumbnail in AdminUploadPage/CreatorStudio
+   2. Frontend sends POST /api/videos (multipart/form-data)
+   3. Multer stores files in memory
+   4. Controller validates input
+   5. Upload video buffer to S3
+   6. Upload thumbnail buffer to S3
+   7. Generate CloudFront signed URLs
+   8. Save metadata to MongoDB:
+      - user: req.user.id
+      - uploadedBy: req.user.role
+   9. Return video object to frontend
+   10. CloudFront serves video via signed URL
+
+
+9. THUMBNAIL UPDATE FLOW
+----------------------------------------------------------------
+
+   1. User clicks "Change Thumbnail" in CreatorStudio/AdminDashboard
+   2. Selects new image file
+   3. Frontend sends PUT /api/videos/:id (multipart/form-data, thumbnail only)
+   4. Backend verifies ownership or admin role
+   5. Deletes old thumbnail from S3
+   6. Uploads new thumbnail to S3
+   7. Updates thumbnailUrl in MongoDB
+   8. Video file remains unchanged
+   9. Frontend refreshes UI
+
+
+10. SECURITY
+----------------------------------------------------------------
+
+   - Passwords: bcrypt 12 rounds, never in API responses
+   - JWT: httpOnly cookie, secure flag, SameSite strict
+   - S3: Private buckets, CloudFront OAC, no public access
+   - Input validation: express-validator on all mutating endpoints
+   - CORS: Restricted origins
+   - RBAC: route-level authorize + controller ownership checks
+   - Role enum: Strict validation prevents invalid assignments
+
+
+11. DEPLOYMENT
+----------------------------------------------------------------
+
+   Backend (EC2):
+   - Amazon Linux 2, t2.medium+
+   - PM2 for process management
+   - Nginx reverse proxy (optional)
+   - Security Group: 22 (SSH), 5000 (API)
+
+   Frontend:
+   - Vercel / Netlify / AWS Amplify / EC2 + Nginx
+
+   Environment Variables:
+   - PORT
+   - NODE_ENV
+   - MONGODB_URI
+   - JWT_SECRET
+   - JWT_EXPIRE / JWT_COOKIE_EXPIRE
+   - AWS_REGION
+   - AWS_ACCESS_KEY_ID
+   - AWS_SECRET_ACCESS_KEY
+   - AWS_S3_BUCKET_NAME
+   - CLOUDFRONT_DOMAIN
+   - CLIENT_URL
+
+
+================================================================
+End of Architecture Documentation
+================================================================
