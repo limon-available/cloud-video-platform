@@ -71,6 +71,14 @@ const Navbar = () => {
                     Become Creator
                   </Link>
                 )}
+                {(isAdmin || isCreator) && (
+                  <Link
+                    to="/admin/studio"
+                    className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium"
+                  >
+                    Studio
+                  </Link>
+                )}
                 {isAdmin && (
                   <Link
                     to="/admin"

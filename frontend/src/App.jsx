@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import WatchHistoryPage from './pages/WatchHistoryPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUploadPage from './pages/AdminUploadPage';
+import CreatorStudio from './pages/CreatorStudio';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="/history" element={<WatchHistoryPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/upload" element={<AdminUploadPage />} />
+            <Route path="/admin/studio" element={<CreatorStudio />} />
           </Routes>
         </div>
       </AuthProvider>

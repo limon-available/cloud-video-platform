@@ -19,7 +19,9 @@ const AdminUploadPage = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  if (!isAuthenticated || !isAdmin) {
+  const { isCreator } = useAuth();
+
+  if (!isAuthenticated || (!isAdmin && !isCreator)) {
     navigate('/');
     return null;
   }
