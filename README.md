@@ -124,26 +124,51 @@ cloud-video-platform/
 └── README.md
 ```
 
+## Role System
+
+| Role | Default | Permissions |
+|------|---------|-------------|
+| **Viewer** | ✅ (new users) | Browse, search, watch videos, view comments |
+| **Creator** | Upgrade from Viewer | All viewer permissions + upload, edit, delete own videos, Creator Studio |
+| **Admin** | Manual assignment | All permissions + user management, system settings |
+
+### Upgrade Flow
+```
+Register → Viewer → Become a Creator (Profile page) → Creator
+```
+
 ## Features
 
-### User Features
-- ✅ User registration and login (JWT + bcrypt)
-- ✅ Browse videos with pagination
+### Guest Features (No Login Required)
+- ✅ Browse home page with video grid
 - ✅ Search videos by title, description, tags
-- ✅ Watch videos with HTML5 player
+- ✅ Watch videos with HTML5 player (served via CloudFront CDN)
+- ✅ View video details (title, description, views, tags)
+- ✅ Read comments
+- ✅ View related videos
+
+### Viewer Features (Logged In - Default)
+- ✅ All guest features
 - ✅ Like/unlike videos
 - ✅ Comment on videos
 - ✅ Watch history tracking
 - ✅ Profile management
 - ✅ Password change
 
-### Admin Features
-- ✅ Upload videos (stored in S3)
+### Creator Features
+- ✅ All viewer features
+- ✅ Upload videos via S3 Presigned URLs
 - ✅ Edit video metadata
-- ✅ Delete videos (removes from S3)
-- ✅ Manage users (role assignment, deletion)
+- ✅ Delete own videos (removes from S3 + CloudFront)
+- ✅ Creator Studio dashboard (`/admin/studio`)
+- ✅ My Videos management with stats
+
+### Admin Features
+- ✅ All creator features
+- ✅ Manage all users (role assignment, deletion)
+- ✅ Manage all videos
 - ✅ Dashboard with analytics
-- ✅ View all videos and users
+- ✅ System-wide settings
 
 ## API Endpoints
 

@@ -170,23 +170,36 @@ const ProfilePage = () => {
                   Connect with your audience
                 </li>
               </ul>
-              <button
-                onClick={async () => {
-                  setUpgrading(true);
-                  try {
-                    await becomeCreator();
-                    setSuccess('Congratulations! You are now a creator.');
-                  } catch (err) {
-                    // Error handled by context
-                  } finally {
-                    setUpgrading(false);
-                  }
-                }}
-                disabled={upgrading}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {upgrading ? 'Upgrading...' : 'Upgrade to Creator'}
-              </button>
+              {upgrading ? (
+                <button
+                  disabled
+                  className="bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium opacity-50 cursor-not-allowed"
+                >
+                  Upgrading...
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    const confirmed = window.confirm(
+                      'Are you sure you want to become a Creator?\n\nYou will gain access to upload and manage videos.'
+                    );
+                    if (!confirmed) return;
+                    setUpgrading(true);
+                    try {
+                      await becomeCreator();
+                      setSuccess('Congratulations! You are now a creator. Redirecting...');
+                      setTimeout(() => navigate('/admin/studio'), 1500);
+                    } catch (err) {
+                      // Error handled by context
+                    } finally {
+                      setUpgrading(false);
+                    }
+                  }}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-medium"
+                >
+                  Become a Creator
+                </button>
+              )}
             </div>
           </div>
         </div>
