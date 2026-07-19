@@ -65,9 +65,14 @@ const CreatorStudio = () => {
     <div className="page-container max-w-6xl">
       <div className="flex items-center justify-between mb-8">
         <h1 className="section-title mb-0">Creator Studio</h1>
-        {(isCreator || isAdmin) && (
-          <Link to="/admin/upload" className="btn-primary">
+        {isCreator && (
+          <Link to="/studio/upload" className="btn-primary">
             + Upload Video
+          </Link>
+        )}
+        {isAdmin && (
+          <Link to="/admin/upload" className="btn-primary">
+            + Upload Video (Admin)
           </Link>
         )}
       </div>

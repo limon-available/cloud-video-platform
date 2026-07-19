@@ -29,6 +29,8 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/upload" element={<AdminUploadPage />} />
             <Route path="/admin/studio" element={<CreatorStudio />} />
+            <Route path="/studio" element={<CreatorStudio />} />
+            <Route path="/studio/upload" element={<AdminUploadPage />} />
           </Routes>
         </div>
       </AuthProvider>

@@ -188,7 +188,7 @@ const ProfilePage = () => {
                     try {
                       await becomeCreator();
                       setSuccess('Congratulations! You are now a creator. Redirecting...');
-                      setTimeout(() => navigate('/admin/studio'), 1500);
+                      setTimeout(() => navigate('/studio'), 1500);
                     } catch (err) {
                       // Error handled by context
                     } finally {

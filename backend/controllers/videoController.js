@@ -90,6 +90,7 @@ exports.uploadVideo = async (req, res, next) => {
       visibility: visibility || 'public',
       status: 'ready',
       user: req.user.id,
+      uploadedBy: req.user.role,
     });
 
     res.status(201).json({

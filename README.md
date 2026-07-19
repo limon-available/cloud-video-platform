@@ -187,9 +187,9 @@ Register → Viewer → Become a Creator (Profile page) → Creator
 |--------|----------|-------------|--------|
 | GET | `/api/videos` | List videos | Public |
 | GET | `/api/videos/:id` | Get video | Public |
-| POST | `/api/videos` | Upload video | Admin |
-| PUT | `/api/videos/:id` | Update video | Admin |
-| DELETE | `/api/videos/:id` | Delete video | Admin |
+| POST | `/api/videos` | Upload video | Admin, Creator |
+| PUT | `/api/videos/:id` | Update video | Admin, Creator |
+| DELETE | `/api/videos/:id` | Delete video | Admin, Creator |
 | POST | `/api/videos/:id/like` | Toggle like | Private |
 | POST | `/api/videos/:id/watch` | Track watch | Private |
 
