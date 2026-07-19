@@ -9,11 +9,12 @@ const CreatorStudio = () => {
   const navigate = useNavigate();
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalVideos: 0,
-    totalViews: 0,
-    totalLikes: 0,
-  });
+    const [stats, setStats] = useState({
+      totalVideos: 0,
+      totalViews: 0,
+      totalLikes: 0,
+    });
+    const [updatingThumbnail, setUpdatingThumbnail] = useState(null);
 
   if (!isAuthenticated || (!isCreator && !isAdmin)) {
     navigate('/');
@@ -58,6 +59,28 @@ const CreatorStudio = () => {
       }));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to delete video');
+    }
+  };
+
+  const handleThumbnailUpdate = async (videoId, file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('thumbnail', file);
+
+    setUpdatingThumbnail(videoId);
+    try {
+      await api.put(`/videos/${videoId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setVideos((prev) =>
+        prev.map((v) => (v._id === videoId ? { ...v, thumbnailUrl: URL.createObjectURL(file) } : v))
+      );
+      alert('Thumbnail updated successfully');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update thumbnail');
+    } finally {
+      setUpdatingThumbnail(null);
     }
   };
 
@@ -116,12 +139,27 @@ const CreatorStudio = () => {
               key={video._id}
               className="bg-gray-800 rounded-xl p-4 flex flex-col sm:flex-row gap-4"
             >
-              <div className="sm:w-64 flex-shrink-0">
+              <div className="sm:w-64 flex-shrink-0 relative group">
                 <img
                   src={video.thumbnailUrl || '/placeholder.jpg'}
                   alt={video.title}
                   className="w-full aspect-video object-cover rounded-lg"
                 />
+                <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center cursor-pointer">
+                  <span className="text-white text-sm font-medium">Change Thumbnail</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => handleThumbnailUpdate(video._id, e.target.files[0])}
+                    disabled={updatingThumbnail === video._id}
+                  />
+                </label>
+                {updatingThumbnail === video._id && (
+                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-lg">
+                    <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  </div>
+                )}
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-lg mb-2">{video.title}</h3>

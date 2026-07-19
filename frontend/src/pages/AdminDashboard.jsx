@@ -12,6 +12,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [updatingThumbnail, setUpdatingThumbnail] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
@@ -51,6 +52,26 @@ const AdminDashboard = () => {
       setVideos((prev) => prev.filter((v) => v._id !== videoId));
     } catch (err) {
       alert('Failed to delete video');
+    }
+  };
+
+  const handleThumbnailUpdate = async (videoId, file) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('thumbnail', file);
+    setUpdatingThumbnail(videoId);
+    try {
+      await api.put(`/videos/${videoId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setVideos((prev) =>
+        prev.map((v) => (v._id === videoId ? { ...v, thumbnailUrl: URL.createObjectURL(file) } : v))
+      );
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update thumbnail');
+    } finally {
+      setUpdatingThumbnail(null);
     }
   };
 
@@ -287,7 +308,8 @@ const AdminDashboard = () => {
                             onChange={(e) => handleRoleChange(user._id, e.target.value)}
                             className="bg-gray-700 text-xs px-2 py-1 rounded border border-gray-600"
                           >
-                            <option value="user">User</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="creator">Creator</option>
                             <option value="admin">Admin</option>
                           </select>
                         </td>
@@ -295,12 +317,25 @@ const AdminDashboard = () => {
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-3 px-4 text-right">
+                          <label className="text-blue-400 hover:text-blue-300 text-sm cursor-pointer mr-3">
+                            Change Thumbnail
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              onChange={(e) => handleThumbnailUpdate(video._id, e.target.files[0])}
+                              disabled={updatingThumbnail === video._id}
+                            />
+                          </label>
                           <button
-                            onClick={() => handleDeleteUser(user._id)}
+                            onClick={() => handleDeleteVideo(video._id)}
                             className="text-red-400 hover:text-red-300 text-sm"
                           >
                             Delete
                           </button>
+                          {updatingThumbnail === video._id && (
+                            <div className="inline-block ml-2 w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          )}
                         </td>
                       </tr>
                     ))}
