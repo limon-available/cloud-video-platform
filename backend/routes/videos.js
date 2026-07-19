@@ -45,7 +45,7 @@ router.get('/my-videos/list', protect, getMyVideos);
 router.post(
   '/',
   protect,
-  authorize('admin'),
+  authorize('admin', 'creator'),
   uploadVideoWithThumbnail,
   uploadVideoValidation,
   uploadVideo
@@ -53,12 +53,12 @@ router.post(
 router.put(
   '/:id',
   protect,
-  authorize('admin'),
+  authorize('admin', 'creator'),
   uploadVideoWithThumbnail,
   updateVideoValidation,
   updateVideo
 );
-router.delete('/:id', protect, authorize('admin'), deleteVideo);
+router.delete('/:id', protect, authorize('admin', 'creator'), deleteVideo);
 router.post('/:id/like', protect, toggleLike);
 router.post('/:id/watch', protect, addToWatchHistory);
 
