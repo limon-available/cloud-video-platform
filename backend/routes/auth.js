@@ -7,6 +7,7 @@ const {
   getMe,
   updateDetails,
   updatePassword,
+  upgradeToCreator,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const {
@@ -23,5 +24,6 @@ router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 router.put('/updatedetails', protect, updateDetails);
 router.put('/updatepassword', protect, updatePassword);
+router.put('/become-creator', protect, upgradeToCreator);
 
 module.exports = router;

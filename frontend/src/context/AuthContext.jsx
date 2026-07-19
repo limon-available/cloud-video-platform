@@ -124,6 +124,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Upgrade viewer role to creator
+  const becomeCreator = async () => {
+    try {
+      setError(null);
+      const { data } = await api.put('/auth/become-creator');
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      return data;
+    } catch (err) {
+      const message =
+        err.response?.data?.error || 'Failed to upgrade to creator.';
+      setError(message);
+      throw new Error(message);
+    }
+  };
+
   const clearError = () => setError(null);
 
   const value = {
@@ -136,9 +153,13 @@ export const AuthProvider = ({ children }) => {
     getProfile,
     updateDetails,
     updatePassword,
+    becomeCreator,
     clearError,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
+    isCreator: user?.role === 'creator',
+    isViewer: user?.role === 'viewer',
+    role: user?.role || null,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

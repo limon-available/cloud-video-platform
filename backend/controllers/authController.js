@@ -212,3 +212,37 @@ exports.updatePassword = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Upgrade viewer role to creator
+ * @route   PUT /api/auth/become-creator
+ * @access  Private (viewer only)
+ *
+ * Allows a viewer to upgrade their account to creator status.
+ * This is a one-way upgrade.
+ */
+exports.upgradeToCreator = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return next(new ErrorResponse('User not found', 404));
+    }
+
+    if (user.role !== 'viewer') {
+      return next(
+        new ErrorResponse(
+          `Cannot upgrade. Current role is '${user.role}'. Only viewers can become creators.`,
+          400
+        )
+      );
+    }
+
+    user.role = 'creator';
+    await user.save();
+
+    sendTokenResponse(user, res);
+  } catch (error) {
+    next(error);
+  }
+};

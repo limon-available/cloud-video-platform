@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 
 const Navbar = () => {
-  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, isCreator, isViewer, logout } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,6 +63,14 @@ const Navbar = () => {
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
               <>
+                {isViewer && (
+                  <Link
+                    to="/profile"
+                    className="text-yellow-400 hover:text-yellow-300 px-3 py-2 text-sm font-medium border border-yellow-500/30 rounded-lg"
+                  >
+                    Become Creator
+                  </Link>
+                )}
                 {isAdmin && (
                   <Link
                     to="/admin"
