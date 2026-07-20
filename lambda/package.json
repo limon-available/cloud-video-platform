@@ -1,0 +1,14 @@
+{
+  "name": "cloud-video-processor",
+  "version": "1.0.0",
+  "description": "AWS Lambda for video processing: thumbnail generation, duration extraction, MongoDB update",
+  "main": "processVideo.js",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/lib-storage": "^3.600.0",
+    "mongoose": "^8.0.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.0.0"
+  }
+}
