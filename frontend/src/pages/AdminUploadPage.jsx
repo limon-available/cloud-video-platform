@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 const AdminUploadPage = () => {
-  const { isAdmin, isAuthenticated } = useAuth();
+  const { isAdmin, isAuthenticated, isCreator } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
@@ -18,8 +18,7 @@ const AdminUploadPage = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-
-  const { isCreator } = useAuth();
+  const [progress, setProgress] = useState('');
 
   if (!isAuthenticated || (!isAdmin && !isCreator)) {
     navigate('/');
@@ -38,20 +37,59 @@ const AdminUploadPage = () => {
     setSuccess(null);
 
     try {
-      const formDataObj = new FormData();
-      formDataObj.append('video', videoFile);
-      if (thumbnailFile) formDataObj.append('thumbnail', thumbnailFile);
-      formDataObj.append('title', formData.title);
-      formDataObj.append('description', formData.description);
-      formDataObj.append('category', formData.category);
-      formDataObj.append('tags', formData.tags);
-      formDataObj.append('visibility', formData.visibility);
+      // Step 1: Request presigned URLs from backend
+      setProgress('Requesting upload URL...');
+      const presignPayload = {
+        videoFileName: videoFile.name,
+        videoContentType: videoFile.type,
+      };
+      if (thumbnailFile) {
+        presignPayload.thumbnailFileName = thumbnailFile.name;
+        presignPayload.thumbnailContentType = thumbnailFile.type;
+      }
 
-      const { data } = await api.post('/videos', formDataObj, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const { data: presignData } = await api.post('/videos/presign', presignPayload);
+      const { video, thumbnail } = presignData.data;
+
+      // Step 2: Upload video directly to S3 via presigned URL
+      setProgress('Uploading video to S3...');
+      await fetch(video.url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': videoFile.type,
+          'x-amz-server-side-encryption': 'AES256',
+        },
+        body: videoFile,
       });
 
-      setSuccess(`Video "${data.data.title}" uploaded successfully!`);
+      // Upload thumbnail directly to S3 if provided
+      let thumbnailKey = '';
+      if (thumbnail && thumbnailFile) {
+        setProgress('Uploading thumbnail to S3...');
+        await fetch(thumbnail.url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': thumbnailFile.type,
+            'x-amz-server-side-encryption': 'AES256',
+          },
+          body: thumbnailFile,
+        });
+        thumbnailKey = thumbnail.key;
+      }
+
+      // Step 3: Confirm upload and save metadata to MongoDB
+      setProgress('Saving video metadata...');
+      const { data: completeData } = await api.post('/videos/complete', {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        tags: formData.tags,
+        visibility: formData.visibility,
+        videoKey: video.key,
+        thumbnailKey,
+      });
+
+      setSuccess(`Video "${completeData.data.title}" uploaded successfully!`);
       setFormData({
         title: '',
         description: '',
@@ -62,9 +100,10 @@ const AdminUploadPage = () => {
       setVideoFile(null);
       setThumbnailFile(null);
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed');
+      setError(err.response?.data?.error || err.message || 'Upload failed');
     } finally {
       setUploading(false);
+      setProgress('');
     }
   };
 
@@ -192,7 +231,7 @@ const AdminUploadPage = () => {
           {uploading ? (
             <span className="flex items-center justify-center">
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-              Uploading to S3...
+              {progress || 'Uploading...'}
             </span>
           ) : (
             'Upload Video'
