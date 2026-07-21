@@ -120,7 +120,7 @@ startServer();
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err.message);
   // Close server gracefully
-  server.close(() => process.exit(1));
+  if (app) app.close(() => process.exit(1));
 });
 
 // Handle uncaught exceptions
