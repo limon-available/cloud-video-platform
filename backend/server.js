@@ -97,9 +97,16 @@ const startServer = async () => {
     await connectDB();
 
     // Ensure S3 bucket CORS allows frontend origins
-    ensureS3Cors(process.env.AWS_S3_BUCKET_NAME).catch((err) =>
-      console.error('Failed to configure S3 CORS:', err.message)
-    );
+    const s3Bucket = process.env.AWS_S3_BUCKET_NAME;
+    if (s3Bucket) {
+      ensureS3Cors(s3Bucket)
+        .then(() => console.log(`S3 CORS configured for bucket: ${s3Bucket}`))
+        .catch((err) =>
+          console.error(`Failed to configure S3 CORS for bucket ${s3Bucket}:`, err.message)
+        );
+    } else {
+      console.warn('AWS_S3_BUCKET_NAME is not set; skipping S3 CORS setup');
+    }
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`
