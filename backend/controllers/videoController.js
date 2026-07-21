@@ -16,6 +16,10 @@ const {
   publishVideoFailed,
   publishVideoDeleted,
 } = require('../utils/notificationService');
+const {
+  logUploadSuccess,
+  logUploadFailure,
+} = require('../utils/cloudwatchLogger');
 
 /**
  * @desc    Upload a video
@@ -273,8 +277,9 @@ exports.completeUpload = async (req, res, next) => {
       uploadedBy: req.user.role,
     });
 
-    // Non-blocking notification
+    // Non-blocking notifications
     publishVideoUploaded(video);
+    logUploadSuccess(video);
 
     res.status(201).json({
       success: true,
@@ -291,6 +296,7 @@ exports.completeUpload = async (req, res, next) => {
       uploadedBy: req.user?.role || 'unknown',
     };
     publishVideoFailed(failedVideo, error.message);
+    logUploadFailure(failedVideo._id, failedVideo.title, error.message);
 
     next(error);
   }

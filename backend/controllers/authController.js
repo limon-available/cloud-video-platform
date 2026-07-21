@@ -2,6 +2,7 @@ const User = require('../models/User');
 const ErrorResponse = require('../utils/errorResponse');
 const { validationResult } = require('express-validator');
 const { publishCreatorUpgrade } = require('../utils/notificationService');
+const { logAuthSuccess, logAuthFailure } = require('../utils/cloudwatchLogger');
 
 /**
  * Generate JWT token and set cookie
@@ -102,9 +103,11 @@ exports.login = async (req, res, next) => {
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      logAuthFailure(email, 'Invalid credentials');
       return next(new ErrorResponse('Invalid credentials', 401));
     }
 
+    logAuthSuccess(user._id.toString(), user.email);
     sendTokenResponse(user, res);
   } catch (error) {
     next(error);
