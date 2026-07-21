@@ -60,8 +60,8 @@ const VideoSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['processing', 'ready', 'failed'],
-      default: 'processing',
+      enum: ['pending', 'processing', 'ready', 'failed'],
+      default: 'pending',
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,

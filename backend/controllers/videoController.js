@@ -130,94 +130,17 @@ const ALLOWED_IMAGE_TYPES = [
 ];
 
 /**
- * @desc    Generate presigned S3 URLs for a direct browser upload
+ * @desc    Generate presigned S3 URLs and create pending video document
  * @route   POST /api/videos/presign
  * @access  Private/Creator/Admin
  *
- * Architecture Flow (step 1 of direct upload):
- * 1. Creator/Admin requests upload URLs, providing filenames and content types
- * 2. Backend generates server-owned S3 keys (namespaced by user id)
- * 3. Backend returns short-lived presigned PUT URLs so the browser can upload
- *    directly to S3, bypassing the Express server
+ * Architecture Flow (fully event-driven):
+ * 1. Creator/Admin provides metadata + filenames
+ * 2. Backend generates presigned URL, creates pending MongoDB doc
+ * 3. Frontend uploads directly to S3
+ * 4. S3 ObjectCreated → Lambda → processes, publishes, logs
  */
 exports.getUploadUrls = async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return next(
-        new ErrorResponse(errors.array().map((e) => e.msg).join(', '), 400)
-      );
-    }
-
-    const { videoFileName, videoContentType, thumbnailFileName, thumbnailContentType } =
-      req.body;
-
-    if (!ALLOWED_VIDEO_TYPES.includes(videoContentType)) {
-      return next(
-        new ErrorResponse(
-          `Invalid video type: ${videoContentType}. Allowed types: MP4, MPEG, MOV, AVI, MKV, WebM`,
-          400
-        )
-      );
-    }
-
-    // Generate server-owned S3 key for the video
-    const videoKey = getVideoKey(req.user.id, videoFileName);
-    const video = await getPresignedUploadUrl(videoKey, videoContentType);
-
-    const response = {
-      video: {
-        key: videoKey,
-        url: video.url,
-        headers: video.headers,
-      },
-    };
-
-    // Generate a thumbnail URL only if the client intends to upload one
-    if (thumbnailFileName && thumbnailContentType) {
-      if (!ALLOWED_IMAGE_TYPES.includes(thumbnailContentType)) {
-        return next(
-          new ErrorResponse(
-            `Invalid image type: ${thumbnailContentType}. Allowed types: JPEG, PNG, WebP`,
-            400
-          )
-        );
-      }
-
-      const thumbnailKey = getThumbnailKey(req.user.id, thumbnailFileName);
-      const thumbnail = await getPresignedUploadUrl(
-        thumbnailKey,
-        thumbnailContentType
-      );
-
-      response.thumbnail = {
-        key: thumbnailKey,
-        url: thumbnail.url,
-        headers: thumbnail.headers,
-      };
-    }
-
-    res.status(200).json({
-      success: true,
-      data: response,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @desc    Finalize a direct upload by storing video metadata
- * @route   POST /api/videos/complete
- * @access  Private/Creator/Admin
- *
- * Architecture Flow (step 3 of direct upload):
- * 1. Browser has already PUT the file(s) directly to S3 (step 2)
- * 2. Client sends back the S3 keys returned during presign, plus metadata
- * 3. Backend verifies each key belongs to the requesting user (security
- *    boundary), builds CloudFront URLs, and saves the document to MongoDB
- */
-exports.completeUpload = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -232,72 +155,53 @@ exports.completeUpload = async (req, res, next) => {
       category,
       tags,
       visibility,
-      videoKey,
-      thumbnailKey,
+      videoFileName,
+      videoContentType,
     } = req.body;
 
-    // Verify the video key was issued to this user during presign
-    const videoPrefix = `videos/${req.user.id}/`;
-    if (!videoKey.startsWith(videoPrefix)) {
-      return next(new ErrorResponse('Invalid video key', 400));
+    if (!ALLOWED_VIDEO_TYPES.includes(videoContentType)) {
+      return next(
+        new ErrorResponse(
+          `Invalid video type: ${videoContentType}. Allowed types: MP4, MPEG, MOV, AVI, MKV, WebM`,
+          400
+        )
+      );
     }
 
-    // Verify the thumbnail key (if provided) was issued to this user
-    if (thumbnailKey) {
-      const thumbnailPrefix = `thumbnails/${req.user.id}/`;
-      if (!thumbnailKey.startsWith(thumbnailPrefix)) {
-        return next(new ErrorResponse('Invalid thumbnail key', 400));
-      }
-    }
-
-    // Generate CloudFront URLs
-    const videoUrl = getCloudFrontSignedUrl(videoKey);
-    const thumbnailUrl = thumbnailKey
-      ? getCloudFrontSignedUrl(thumbnailKey)
-      : '';
+    // Generate server-owned S3 key for the video
+    const videoKey = getVideoKey(req.user.id, videoFileName);
+    const presigned = await getPresignedUploadUrl(videoKey, videoContentType);
 
     // Parse tags
     const parsedTags = tags
       ? tags.split(',').map((tag) => tag.trim()).filter(Boolean)
       : [];
 
-    // Create video document in MongoDB
+    // Create pending video document in MongoDB (status: pending)
     const video = await Video.create({
       title,
       description,
-      thumbnailUrl,
-      videoUrl,
       s3VideoKey: videoKey,
-      s3ThumbnailKey: thumbnailKey || '',
       category: category || 'Uncategorized',
       tags: parsedTags,
       visibility: visibility || 'public',
-      status: 'processing',
+      status: 'pending',
       user: req.user.id,
       uploadedBy: req.user.role,
     });
 
-    // Non-blocking notifications
-    publishVideoUploaded(video);
-    logUploadSuccess(video);
-
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      data: video,
+      data: {
+        videoId: video._id,
+        video: {
+          key: videoKey,
+          url: presigned.url,
+          headers: presigned.headers,
+        },
+      },
     });
   } catch (error) {
-    // Notify failure
-    const failedVideo = {
-      _id: req.body?.title || 'unknown',
-      title: req.body?.title || 'unknown',
-      description: req.body?.description || '',
-      category: req.body?.category || '',
-      status: 'failed',
-      uploadedBy: req.user?.role || 'unknown',
-    };
-    publishVideoFailed(failedVideo, error.message);
-    logUploadFailure(failedVideo._id, failedVideo.title, error.message);
-
     next(error);
   }
 };

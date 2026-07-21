@@ -5,6 +5,8 @@
   "main": "processVideo.js",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/client-sns": "^3.600.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.600.0",
     "@aws-sdk/lib-storage": "^3.600.0",
     "mongoose": "^8.0.0",
     "fluent-ffmpeg": "^2.1.2",

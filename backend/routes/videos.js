@@ -10,7 +10,6 @@ const {
   addToWatchHistory,
   getMyVideos,
   getUploadUrls,
-  completeUpload,
 } = require('../controllers/videoController');
 const {
   addComment,
@@ -22,7 +21,6 @@ const {
   uploadVideoValidation,
   updateVideoValidation,
   presignValidation,
-  completeUploadValidation,
 } = require('../validators/videoValidator');
 const { body } = require('express-validator');
 
@@ -44,20 +42,13 @@ router.post(
   addComment
 );
 
-// Presigned URL routes (direct browser-to-S3 upload)
+// Presigned URL route (event-driven: creates pending doc, returns presigned URL)
 router.post(
   '/presign',
   protect,
   authorize('admin', 'creator'),
   presignValidation,
   getUploadUrls
-);
-router.post(
-  '/complete',
-  protect,
-  authorize('admin', 'creator'),
-  completeUploadValidation,
-  completeUpload
 );
 
 // Protected routes

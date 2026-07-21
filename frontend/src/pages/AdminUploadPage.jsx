@@ -14,7 +14,6 @@ const AdminUploadPage = () => {
     visibility: 'public',
   });
   const [videoFile, setVideoFile] = useState(null);
-  const [thumbnailFile, setThumbnailFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -24,6 +23,32 @@ const AdminUploadPage = () => {
     navigate('/');
     return null;
   }
+
+  const pollVideoStatus = async (videoId) => {
+    return new Promise((resolve, reject) => {
+      const maxAttempts = 30;
+      let attempts = 0;
+
+      const check = async () => {
+        attempts++;
+        try {
+          const { data } = await api.get(`/videos/${videoId}`);
+          if (data.data.status === 'ready') {
+            resolve(data.data);
+          } else if (data.data.status === 'failed') {
+            reject(new Error('Video processing failed'));
+          } else if (attempts >= maxAttempts) {
+            reject(new Error('Processing timeout'));
+          } else {
+            setTimeout(check, 2000);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+      check();
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,19 +62,19 @@ const AdminUploadPage = () => {
     setSuccess(null);
 
     try {
-      // Step 1: Request presigned URLs from backend
+      // Step 1: Request presigned URL + create pending MongoDB doc
       setProgress('Requesting upload URL...');
-      const presignPayload = {
+      const { data: presignData } = await api.post('/videos/presign', {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        tags: formData.tags,
+        visibility: formData.visibility,
         videoFileName: videoFile.name,
         videoContentType: videoFile.type,
-      };
-      if (thumbnailFile) {
-        presignPayload.thumbnailFileName = thumbnailFile.name;
-        presignPayload.thumbnailContentType = thumbnailFile.type;
-      }
+      });
 
-      const { data: presignData } = await api.post('/videos/presign', presignPayload);
-      const { video, thumbnail } = presignData.data;
+      const { videoId, video } = presignData.data;
 
       // Step 2: Upload video directly to S3 via presigned URL
       setProgress('Uploading video to S3...');
@@ -62,34 +87,11 @@ const AdminUploadPage = () => {
         body: videoFile,
       });
 
-      // Upload thumbnail directly to S3 if provided
-      let thumbnailKey = '';
-      if (thumbnail && thumbnailFile) {
-        setProgress('Uploading thumbnail to S3...');
-        await fetch(thumbnail.url, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': thumbnailFile.type,
-            'x-amz-server-side-encryption': 'AES256',
-          },
-          body: thumbnailFile,
-        });
-        thumbnailKey = thumbnail.key;
-      }
+      // Step 3: Poll until Lambda processes and status becomes "ready"
+      setProgress('Processing video (generating thumbnail, extracting duration)...');
+      const processedVideo = await pollVideoStatus(videoId);
 
-      // Step 3: Confirm upload and save metadata to MongoDB
-      setProgress('Saving video metadata...');
-      const { data: completeData } = await api.post('/videos/complete', {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        tags: formData.tags,
-        visibility: formData.visibility,
-        videoKey: video.key,
-        thumbnailKey,
-      });
-
-      setSuccess(`Video "${completeData.data.title}" uploaded successfully!`);
+      setSuccess(`Video "${processedVideo.title}" published successfully!`);
       setFormData({
         title: '',
         description: '',
@@ -98,7 +100,6 @@ const AdminUploadPage = () => {
         visibility: 'public',
       });
       setVideoFile(null);
-      setThumbnailFile(null);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Upload failed');
     } finally {
@@ -133,19 +134,6 @@ const AdminUploadPage = () => {
             type="file"
             accept="video/mp4,video/mpeg,video/quicktime,video/webm"
             onChange={(e) => setVideoFile(e.target.files[0])}
-            className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-600 file:text-white hover:file:bg-primary-700"
-          />
-        </div>
-
-        {/* Thumbnail */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Thumbnail Image
-          </label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => setThumbnailFile(e.target.files[0])}
             className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-600 file:text-white hover:file:bg-primary-700"
           />
         </div>
