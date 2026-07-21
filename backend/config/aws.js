@@ -1,6 +1,7 @@
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { CloudFrontClient } = require('@aws-sdk/client-cloudfront');
 const { Upload } = require('@aws-sdk/lib-storage');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 /**
  * AWS Configuration (SDK v3)
@@ -85,6 +86,44 @@ const uploadToS3 = async (fileBuffer, key, contentType) => {
 };
 
 /**
+ * Generate a presigned URL for a direct browser upload (PUT) to S3
+ *
+ * The browser uploads bytes straight to S3 using this URL, bypassing the
+ * Express server. The ContentType is baked into the signature, so the client
+ * must PUT with the exact same Content-Type header or S3 rejects the request.
+ *
+ * @param {string} key - S3 object key
+ * @param {string} contentType - MIME type the client will upload
+ * @param {number} expiresIn - URL lifetime in seconds (default 300)
+ * @returns {Promise<{url: string, headers: Object}>} Presigned PUT URL and the
+ *          headers the client MUST send on the PUT (they are signed).
+ */
+const getPresignedUploadUrl = async (key, contentType, expiresIn = 300) => {
+  const bucketName = process.env.AWS_S3_BUCKET_NAME;
+
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+    ContentType: contentType,
+    ServerSideEncryption: 'AES256',
+  });
+
+  try {
+    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    return {
+      url,
+      headers: {
+        'Content-Type': contentType,
+        'x-amz-server-side-encryption': 'AES256',
+      },
+    };
+  } catch (error) {
+    console.error('S3 presign error:', error);
+    throw new Error('Failed to generate upload URL');
+  }
+};
+
+/**
  * Delete file from S3 using SDK v3
  * @param {string} key - S3 object key
  * @returns {Promise<void>}
@@ -133,6 +172,7 @@ module.exports = {
   cloudfrontClient,
   getCloudFrontSignedUrl,
   uploadToS3,
+  getPresignedUploadUrl,
   deleteFromS3,
   getVideoKey,
   getThumbnailKey,
