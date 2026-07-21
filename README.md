@@ -344,19 +344,24 @@ sudo systemctl enable nginx
 
 The application logs are structured for CloudWatch integration:
 
-```javascript
-// Log format for CloudWatch
-console.log(JSON.stringify({
-  level: 'info',
-  timestamp: new Date().toISOString(),
-  service: 'cloud-video-api',
-  message: 'Request processed',
-  method: req.method,
-  path: req.originalUrl,
-  statusCode: res.statusCode,
-  duration: `${duration}ms`
-}));
+- **Log Group**: `/cloud-video/backend`
+- **Log Streams**: `upload-stream`, `auth-stream`, `error-stream`
+- **Metrics extracted**: `UploadFailureCount`, `ErrorStreamCount`
+- **Alarms**: UploadFailureAlarm, HighErrorRateAlarm (publish to SNS topic)
+
+### Setup CloudWatch Alarms
+
+```bash
+node scripts/setup-cloudwatch-alarms.js \
+  --sns-topic-arn arn:aws:sns:us-east-1:123456789012:cloud-video-notifications
 ```
+
+This creates:
+- **UploadFailureAlarm** — triggers on any `upload.failure` event (1+ in 5 min)
+- **LambdaFailureAlarm** — triggers on Lambda errors (1+ in 5 min)
+- **HighErrorRateAlarm** — triggers on 3+ errors in 5 min
+
+Each alarm sends email via the SNS topic. Safe to re-run.
 
 ## License
 
