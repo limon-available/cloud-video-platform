@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const ErrorResponse = require('../utils/errorResponse');
 const { validationResult } = require('express-validator');
+const { publishCreatorUpgrade } = require('../utils/notificationService');
 
 /**
  * Generate JWT token and set cookie
@@ -240,6 +241,9 @@ exports.upgradeToCreator = async (req, res, next) => {
 
     user.role = 'creator';
     await user.save();
+
+    // Non-blocking notification
+    publishCreatorUpgrade(user);
 
     sendTokenResponse(user, res);
   } catch (error) {

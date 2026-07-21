@@ -11,6 +11,11 @@ const {
   getCloudFrontSignedUrl,
 } = require('../config/aws');
 const { validationResult } = require('express-validator');
+const {
+  publishVideoUploaded,
+  publishVideoFailed,
+  publishVideoDeleted,
+} = require('../utils/notificationService');
 
 /**
  * @desc    Upload a video
@@ -268,11 +273,25 @@ exports.completeUpload = async (req, res, next) => {
       uploadedBy: req.user.role,
     });
 
+    // Non-blocking notification
+    publishVideoUploaded(video);
+
     res.status(201).json({
       success: true,
       data: video,
     });
   } catch (error) {
+    // Notify failure
+    const failedVideo = {
+      _id: req.body?.title || 'unknown',
+      title: req.body?.title || 'unknown',
+      description: req.body?.description || '',
+      category: req.body?.category || '',
+      status: 'failed',
+      uploadedBy: req.user?.role || 'unknown',
+    };
+    publishVideoFailed(failedVideo, error.message);
+
     next(error);
   }
 };
@@ -506,6 +525,9 @@ exports.deleteVideo = async (req, res, next) => {
 
     // Delete video document
     await video.remove();
+
+    // Non-blocking notification
+    publishVideoDeleted(video, req.user);
 
     res.status(200).json({
       success: true,
