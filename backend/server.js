@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
+const { ensureS3Cors } = require('./config/awsCors');
 
 // Load environment variables
 dotenv.config();
@@ -94,6 +95,11 @@ const startServer = async () => {
   try {
     // Connect to MongoDB Atlas
     await connectDB();
+
+    // Ensure S3 bucket CORS allows frontend origins
+    ensureS3Cors(process.env.AWS_S3_BUCKET_NAME).catch((err) =>
+      console.error('Failed to configure S3 CORS:', err.message)
+    );
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`
